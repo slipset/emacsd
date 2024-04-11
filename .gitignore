@@ -1,0 +1,10 @@
+/.cache/
+/elpa/
+/straight/
+/transient/
+/.lsp-session-v1
+/projectile.cache
+/projectile-bookmarks.eld
+/custom.el
+/auto-save-list/
+*~
