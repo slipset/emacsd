@@ -163,6 +163,8 @@
 ;	    (enable-paredit-mode)
             (when (string-equal "tsx" (file-name-extension buffer-file-name))
               (setup-tide-mode))))
+(use-package prettier-js)
+(add-hook 'web-mode-hook 'prettier-js-mode)
 
 (add-hook 'emacs-lisp-mode-hook 'enable-paredit-mode)
 
