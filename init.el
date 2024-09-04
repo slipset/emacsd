@@ -210,19 +210,17 @@
 
 (use-package lsp-mode
   :bind ((:map lsp-mode-map
-	       ("M-<return>" . lsp-execute-code-action)))
+	       ("M-<return>" . lsp-execute-code-action))
+	 (:map lsp-mode-map
+	       ("C-c C-r" . lsp-find-references)))
   :hook ((clojure-mode . lsp)
          (clojurec-mode . lsp)
          (clojurescript-mode . lsp)
 	 (web-mode . lsp-deferred))
   :init (add-hook 'lsp-mode-hook #'lsp-lens-mode)
   :config
-  (use-package lsp-ui
-    :after lsp
-    :init
-    (setq lsp-ui-sideline-show-code-actions t)
-    (setq lsp-ui-sideline-show-diagnostics t))
   (setq lsp-lens-place-position 'above-line)
+  (setq lsp-lens-enable t)
   ;; add paths to your local installation of project mgmt tools, like lein
   (setenv "PATH" (concat
                   "/usr/local/bin" path-separator
@@ -232,6 +230,20 @@
                clojurescript-mode
                clojurex-mode))
      (add-to-list 'lsp-language-id-configuration `(,m . "clojure"))))
+
+(use-package lsp-ui
+  :after lsp-mode
+  :custom (lsp-ui-peek-enable nil)
+          (lsp-ui-doc-show-with-mouse nil)
+          (lsp-ui-doc-show-with-cursor nil)
+          (lsp-ui-doc-delay 1)
+          (lsp-ui-doc-position 'at-point)
+          (lsp-ui-sideline-show-hover nil)
+          (lsp-ui-sideline-show-diagnostics nil)
+          (lsp-ui-sideline-show-code-actions nil)
+          (lsp-ui-sideline-update-mode 'point)
+          (lsp-ui-sideline-delay 1))
+
 (use-package magit)
 (use-package git-gutter
   :hook (prog-mode . git-gutter-mode)
