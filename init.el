@@ -170,6 +170,9 @@
 (use-package prettier-js)
 (add-hook 'typescript-ts-mode-hook 'prettier-js-mode)
 (add-hook 'tsx-ts-mode-hook 'prettier-js-mode)
+(add-hook 'typescript-ts-mode-hook
+          (lambda ()
+            (setq-local lsp-enable-on-type-formatting nil)))
 
 (use-package jest
   :ensure t
