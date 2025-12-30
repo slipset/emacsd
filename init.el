@@ -97,6 +97,8 @@
 (setq mac-command-modifier 'meta)
 
 (use-package magit)
+(use-package forge
+  :after magit)
 (use-package editorconfig)
 (use-package diminish)
 (use-package window-purpose)
@@ -107,6 +109,33 @@
 (ivy-mode 1)
 (setq ivy-use-virtual-buffers t)
 (setq ivy-count-format "(%d/%d) ")
+
+(use-package forge
+  :after magit)
+
+
+(setq magit-refresh-status-buffer nil) ;; Disable auto-refresh on save (manual 'g' instead)
+
+;; Remove the slowest "header" and "extra" sections
+(remove-hook 'magit-status-sections-hook 'magit-insert-tags-header)
+(remove-hook 'magit-status-sections-hook 'magit-insert-unpulled-from-upstream)
+(remove-hook 'magit-status-sections-hook 'magit-insert-unpushed-to-pushremote)
+(remove-hook 'magit-status-sections-hook 'magit-insert-unpushed-to-upstream-or-recent)
+(remove-hook 'magit-status-sections-hook 'magit-insert-unpulled-from-pushremote)
+(remove-hook 'magit-status-sections-hook 'forge-insert-merged-pullreqs)
+
+(defun my/magit-insert-branch-header-simple ()
+  "Insert a header with only the current branch name, no upstream tracking."
+  (let ((branch (magit-get-current-branch)))
+    (when branch
+      (insert (propertize "Head:  " 'face 'magit-header-line))
+      (insert (propertize branch 'face 'magit-branch-local))
+      (insert "\n"))))
+
+;; Update your headers hook
+(setq magit-status-headers-hook
+      '(my/magit-insert-branch-header-simple
+        magit-insert-diff-filter-header))
 
 (use-package projectile
   :init
@@ -132,39 +161,23 @@
 (use-package company-box
   :hook (company-mode . company-box-mode))
 
-(use-package tide
-  :after (company flycheck)
-  :hook ((typescript-ts-mode . tide-setup)
-         (tsx-ts-mode . tide-setup)
-         (typescript-ts-mode . tide-hl-identifier-mode)))
 
-(use-package web-mode
-  :mode (("\\.js\\'" . web-mode)
-         ("\\.jsx\\'" .  web-mode)
-         ("\\.ts\\'" . web-mode)
-         ("\\.tsx\\'" . web-mode)
-         ("\\.html\\'" . web-mode))
-  :commands web-mode)
 
-(setq web-mode-markup-indent-offset 2)
-(setq web-mode-code-indent-offset 2)
-(setq web-mode-css-indent-offset 2)
+(use-package typescript-ts-mode
+  :mode (("\\.ts\\'" . typescript-ts-mode)
+         ("\\.tsx\\'" . tsx-ts-mode)))
 
-(defun setup-tide-mode ()
-  (interactive)
-  (tide-setup)
-  (flycheck-mode +1)
-  (setq flycheck-check-syntax-automatically '(save mode-enabled))
-  (eldoc-mode +1)
-  (tide-hl-identifier-mode +1))
-
-(add-hook 'web-mode-hook
-          (lambda ()
-;	    (enable-paredit-mode)
-            (when (string-equal "tsx" (file-name-extension buffer-file-name))
-              (setup-tide-mode))))
 (use-package prettier-js)
-(add-hook 'web-mode-hook 'prettier-js-mode)
+(add-hook 'typescript-ts-mode-hook 'prettier-js-mode)
+(add-hook 'tsx-ts-mode-hook 'prettier-js-mode)
+
+(use-package jest
+  :ensure t
+  :hook (typescript-ts-mode . jest-minor-mode)
+  :bind (:map jest-minor-mode-map
+         ("C-c C-t t" . jest-function)
+         ("C-c C-t b" . jest-file)
+         ("C-c C-t a" . jest-project)))
 
 (add-hook 'emacs-lisp-mode-hook 'enable-paredit-mode)
 
@@ -216,50 +229,81 @@
   :hook ((clojure-mode . lsp)
          (clojurec-mode . lsp)
          (clojurescript-mode . lsp)
-	 (web-mode . lsp-deferred))
+	 (typescript-ts-mode . lsp-deferred)
+	 (tsx-ts-mode . lsp-deferred))
   :init (add-hook 'lsp-mode-hook #'lsp-lens-mode)
   :config
   (setq lsp-lens-place-position 'above-line)
   (setq lsp-lens-enable t)
+
   ;; add paths to your local installation of project mgmt tools, like lein
   (setenv "PATH" (concat
+                  "/opt/homebrew/bin" path-separator
                   "/usr/local/bin" path-separator
                   (getenv "PATH")))
+  (setq exec-path (append '("/opt/homebrew/bin" "/usr/local/bin") exec-path))
   (dolist (m '(clojure-mode
                clojurec-mode
                clojurescript-mode
                clojurex-mode))
-     (add-to-list 'lsp-language-id-configuration `(,m . "clojure"))))
+     (add-to-list 'lsp-language-id-configuration `(,m . "clojure")))
+  (add-to-list 'lsp-language-id-configuration '(typescript-ts-mode . "typescript"))
+  (add-to-list 'lsp-language-id-configuration '(tsx-ts-mode . "typescriptreact")))
 
+(with-eval-after-load 'lsp-mode
+  (add-to-list 'lsp-disabled-clients 'ts-ls)
+
+  (lsp-register-client
+   (make-lsp-client
+    :new-connection (lsp-stdio-connection '("vtsls" "--stdio"))
+    :activation-fn (lsp-activate-on "typescript" "typescriptreact")
+    :priority 1
+    :server-id 'vtsls
+    :initialization-options (lambda ()
+                              (ht ("typescript" (ht ("referencesCodeLens" (ht ("enabled" t) ("showOnAllFunctions" t)))
+                                                    ("implementationsCodeLens" (ht ("enabled" t)))))
+                                  ("javascript" (ht ("referencesCodeLens" (ht ("enabled" t) ("showOnAllFunctions" t)))))))
+    :initialized-fn (lambda (workspace)
+                      (with-lsp-workspace workspace
+                        (lsp--set-configuration
+                         (ht ("typescript" (ht ("referencesCodeLens" (ht ("enabled" t) ("showOnAllFunctions" t)))
+                                               ("implementationsCodeLens" (ht ("enabled" t)))))
+                             ("javascript" (ht ("referencesCodeLens" (ht ("enabled" t) ("showOnAllFunctions" t))))))))))))
 (use-package lsp-ui
   :after lsp-mode
   :custom (lsp-ui-peek-enable nil)
-          (lsp-ui-doc-show-with-mouse nil)
-          (lsp-ui-doc-show-with-cursor nil)
-          (lsp-ui-doc-delay 1)
-          (lsp-ui-doc-position 'at-point)
-          (lsp-ui-sideline-show-hover nil)
-          (lsp-ui-sideline-show-diagnostics nil)
-          (lsp-ui-sideline-show-code-actions nil)
-          (lsp-ui-sideline-update-mode 'point)
-          (lsp-ui-sideline-delay 1))
+  (lsp-ui-doc-show-with-mouse nil)
+  (lsp-ui-doc-show-with-cursor nil)
+  (lsp-ui-doc-delay 1)
+  (lsp-ui-doc-position 'at-point)
+  (lsp-ui-sideline-show-hover nil)
+  (lsp-ui-sideline-show-diagnostics nil)
+  (lsp-ui-sideline-show-code-actions nil)
+  (lsp-ui-sideline-update-mode 'point)
+  (lsp-ui-sideline-delay 1))
 
-(use-package magit)
 (use-package git-gutter
   :hook (prog-mode . git-gutter-mode)
   :config (setq git-gutter:update-inverval 0.02))
 
-(use-package git-gutter-fringe
+(use-package smartparens
+  :hook ((typescript-ts-mode . smartparens-mode)
+         (tsx-ts-mode . smartparens-mode))
   :config
-  (setq git-gutter-fr:side 'left-fringe)
-  (define-fringe-bitmap 'git-gutter-fr:added [224] nil nil '(center repeated))
-  (define-fringe-bitmap 'git-gutter-fr:modified [224] nil nil '(center repeated))
-  (define-fringe-bitmap 'git-gutter-fr:deleted [128 192 224 240] nil nil 'bottom))
+  (require 'smartparens-config)
+  (define-key smartparens-mode-map (kbd "C-)") 'sp-forward-slurp-sexp)
+  (define-key smartparens-mode-map (kbd "C-(") 'sp-backward-slurp-sexp)
+  (define-key smartparens-mode-map (kbd "C-}") 'sp-forward-barf-sexp)
+  (define-key smartparens-mode-map (kbd "C-{") 'sp-backward-barf-sexp)
+  (define-key smartparens-mode-map (kbd "C-M-k") 'sp-kill-sexp)
+  (define-key smartparens-mode-map (kbd "C-M-f") 'sp-forward-sexp)
+  (define-key smartparens-mode-map (kbd "C-M-b") 'sp-backward-sexp))
 
-(use-package smartparens-mode
-  :ensure smartparens  ;; install the package
-  :hook (web-mode) ;; add `smartparens-mode` to these hooks
-)
+(use-package beacon
+  :defer t
+  :init  (beacon-mode 1)
+  :config
+  (setq beacon-blink-when-window-scrolls nil))
 
 (global-git-gutter-mode +1)
 (add-hook 'git-gutter:update-hooks 'magit-revert-buffer-hook)
