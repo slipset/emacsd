@@ -297,7 +297,9 @@
   (define-key smartparens-mode-map (kbd "C-{") 'sp-backward-barf-sexp)
   (define-key smartparens-mode-map (kbd "C-M-k") 'sp-kill-sexp)
   (define-key smartparens-mode-map (kbd "C-M-f") 'sp-forward-sexp)
-  (define-key smartparens-mode-map (kbd "C-M-b") 'sp-backward-sexp))
+  (define-key smartparens-mode-map (kbd "C-M-b") 'sp-backward-sexp)
+  (define-key smartparens-mode-map (kbd "M-R") 'sp-raise-sexp)
+  (define-key smartparens-mode-map (kbd "M-s") 'sp-splice-sexp))
 
 (use-package beacon
   :defer t
